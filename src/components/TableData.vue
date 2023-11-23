@@ -15,16 +15,7 @@
         <th id="status_pay" data-sorted="1" @click="sortString('pay_status', $event)">Статус оплаты</th>
         <th id="comment_courier" data-sorted="1" @click="sortString('courier_comment', $event)">Комментарии куръера</th>
         <th id="inner_comment" data-sorted="1" @click="sortString('inner_comment', $event)">Внутренние комментарии</th>
-        <th id="status_diet" :class="{ 'text-red': showSortStatus }" @click="handleSortClick">
-          Статус диеты
-          <ul v-if="showSortStatus">
-            <li @click.stop="sortDaysBegin">Начинается через Х дней</li>
-            <li @click.stop="sortDaysToday">Заканчивается сегодня</li>
-            <li @click.stop="sortDaysTomorrow">Заканчивается завтра</li>
-            <li @click.stop="sortDaysEnd">Заканчивается через Х дней</li>
-            <li @click.stop="sortDaysPast">Закончилась Х дней назад</li>
-          </ul>
-        </th>
+        <th id="status_diet" @click="sortStatus">Статус диеты</th>
       </tr>
     </thead>
     <tbody>
@@ -96,7 +87,6 @@ export default {
   setup() {
     const myJson = ref(json);
     const processedJson = ref();
-    const showSortStatus = ref(false);
     const currentDate = new Date();
     const oneDayMilliseconds = 24 * 60 * 60 * 1000;
 
@@ -230,132 +220,105 @@ export default {
       event.currentTarget.setAttribute('data-sorted', -sortOrder);
     };
 
-    const handleSortClick = () => {
-      showSortStatus.value = !showSortStatus.value;
-    };
+    const sortStatus = () => {
+      let startingArray = myJson.value;
+      const soonBegin = [];
+      const todayEnd = [];
+      const tomorrowEnd = [];
+      const soonEnd = [];
+      const ended = [];
 
-    const sortDaysBegin = () => {
-      const positiveDifference = [];
-
-      myJson.value.forEach(item => {
-        const daysDifference = calculateDays(new Date(item.dates[0].start_date), currentDate);
-
-        if (daysDifference >= 0) {
-          positiveDifference.push(item);
-        }
-      });
-
-      positiveDifference.sort((a, b) => {
-        const daysDifferenceA = calculateDays(new Date(a.dates[0].start_date), currentDate);
-        const daysDifferenceB = calculateDays(new Date(b.dates[0].start_date), currentDate);
-
-        return daysDifferenceA - daysDifferenceB;
-      });
-
-      processedJson.value = positiveDifference;
-    };
-
-    const sortDaysToday = () => {
-      const positive = [];
-
-      myJson.value.forEach(item => {
-        if (currentDate > new Date(item.dates[0].start_date) && currentDate <= new Date(item.dates[0].end_date)) {
-          const daysRemaining = calculateDays(new Date(item.dates[0].end_date), currentDate);
-          if (daysRemaining === 0) {
-            positive.push(item);
-          }
-        }
-      });
-
-      if (positive.length === 0 ) {
-        return alert('Диет, заканчивающихся сегодня нет');
-      }
-
-      processedJson.value = positive;
-    };
-
-    const sortDaysTomorrow = () => {
-      const positive = [];
-
-      myJson.value.forEach(item => {
-        if (currentDate > new Date(item.dates[0].start_date) && currentDate <= new Date(item.dates[0].end_date)) {
-          const daysRemaining = calculateDays(new Date(item.dates[0].end_date), currentDate);
-          if (daysRemaining === 1) {
-            positive.push(item);
-          }
-        }
-      });
-
-      if (positive.length === 0 ) {
-        return alert('Диет, заканчивающихся завтра нет');
-      }
-
-      processedJson.value = positive;
-    };
-
-    const sortDaysEnd= () => {
-      const positive = [];
-
-      myJson.value.forEach(item => {
-        if (currentDate > new Date(item.dates[0].start_date) && currentDate <= new Date(item.dates[0].end_date)) {
-          const daysRemaining = calculateDays(new Date(item.dates[0].end_date), currentDate);
-          if (daysRemaining >= 0) {
-            positive.push(item);
-          }
-        }
-      });
-
-      positive.sort((a, b) => {
-        const daysDifferenceA = calculateDays(new Date(a.dates[0].end_date), currentDate);
-        const daysDifferenceB = calculateDays(new Date(b.dates[0].end_date), currentDate);
-
-        return daysDifferenceA - daysDifferenceB;
-      });
-
-      processedJson.value = positive;
-    };
-
-    const sortDaysPast = () => {
-      const positiveDifference = [];
-      // const negativeDifference = [];
-
-      // myJson.value.forEach(item => {
-      //   const daysDifference = calculateDays(currentDate, new Date(item.dates[0].end_date));
-
-      //   if (daysDifference > 0) {
-      //     positiveDifference.push(item);
-      //   } else {
-      //     // negativeDifference.push(item);
-      //   }
-      // });
-
-      myJson.value.forEach(item => {
-        let positiveDifferenceFound = false;
-
-        item.dates.forEach(dateItem => {
-          if (positiveDifferenceFound) {
-              return;
-          }
-          const daysDifference = calculateDays(currentDate, new Date(dateItem.end_date));
-
-          if (daysDifference > 0) {
-            positiveDifference.push(item);
-            positiveDifferenceFound = true;
-            return;
-          }
+      // soonBegin
+      startingArray = startingArray.filter(item => {
+        const condition = item.dates.some(date => {
+          const daysDifference = calculateDays(new Date(date.start_date), currentDate);
+          return daysDifference >= 0;
         });
+
+        if (condition) {
+          soonBegin.push(item);
+          return false;
+        }
+
+        return true;
+      });
+      soonBegin.sort((a, b) => {
+        const getMaxDaysDifference = (item) => {
+          return Math.max(
+            ...item.dates.map(date =>
+              calculateDays(new Date(date.start_date), currentDate)
+            )
+          );
+        };
+
+        const daysDifferenceA = getMaxDaysDifference(a);
+        const daysDifferenceB = getMaxDaysDifference(b);
+
+        return daysDifferenceB - daysDifferenceA;
       });
 
-      positiveDifference.sort((a, b) => {
-        const daysDifferenceA = calculateDays(currentDate, new Date(a.dates[0].end_date));
-        const daysDifferenceB = calculateDays(currentDate, new Date(b.dates[0].end_date));
+      // todayEnd, tomorrowEnd, soonEnd
+      startingArray = startingArray.filter(item => {
+        const shouldExcludeItem = !item.dates.some(date => {
+          const startDate = new Date(date.start_date);
+          const endDate = new Date(date.end_date);
+
+          if (currentDate > startDate && currentDate <= endDate) {
+            const daysRemaining = calculateDays(endDate, currentDate);
+
+            if (daysRemaining === 0) {
+              todayEnd.push(item);
+            } else if (daysRemaining === 1) {
+              tomorrowEnd.push(item);
+            } else {
+              soonEnd.push(item);
+            }
+
+            return true;
+          }
+
+          return false;
+        });
+
+        return shouldExcludeItem;
+      });
+      soonEnd.sort((a, b) => {
+        const getMaxDaysDifference = (item) => {
+          return Math.max(
+            ...item.dates.map(date =>
+              calculateDays(new Date(date.end_date), currentDate)
+            )
+          );
+        };
+
+        const daysDifferenceA = getMaxDaysDifference(a);
+        const daysDifferenceB = getMaxDaysDifference(b);
 
         return daysDifferenceA - daysDifferenceB;
       });
 
-      // const sortedAndMergedArray = positiveDifference.concat(negativeDifference);
-      processedJson.value = positiveDifference;
-    };
+      // Ended
+      startingArray.forEach(item => {
+          ended.push(item);
+      });
+      ended.sort((a, b) => {
+        const getMaxDaysDifference = (item) => {
+          return Math.max(
+            ...item.dates.map(date =>
+              calculateDays(currentDate, new Date(date.end_date))
+            )
+          );
+        };
+
+        const daysDifferenceA = getMaxDaysDifference(a);
+        const daysDifferenceB = getMaxDaysDifference(b);
+
+        return daysDifferenceA - daysDifferenceB;
+      });
+
+      // Total
+      processedJson.value = soonBegin.concat(todayEnd, tomorrowEnd, soonEnd, ended);
+    }
 
     const calculateDays = (dateA, dateB) => {
       const timeDifference = dateA - dateB;
@@ -370,13 +333,7 @@ export default {
       sortString,
       sortArrayString,
       sortArrayObject,
-      showSortStatus,
-      handleSortClick,
-      sortDaysBegin,
-      sortDaysToday,
-      sortDaysPast,
-      sortDaysTomorrow,
-      sortDaysEnd
+      sortStatus,
     };
   },
 };
